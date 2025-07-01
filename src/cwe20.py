@@ -344,7 +344,7 @@ async def search_users_secure(search_request: SearchRequest):
 
 class CreateUserRequest(BaseModel):
     """Comprehensive input validation for user creation"""
-    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_]+
+    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_]+$')
     
     @validator('email')
     def validate_email_domain(cls, v):
