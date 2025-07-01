@@ -291,7 +291,7 @@ async def read_file_secure(filename: str = Query(..., min_length=1, max_length=1
 
 class SearchRequest(BaseModel):
     """Request model with validation for search endpoint"""
-    query: str = Field(..., min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9\s._-]+
+    query: str = Field(..., min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9\s._-]+$')
 
 @app.post("/secure/search")
 async def search_users_secure(search_request: SearchRequest):
