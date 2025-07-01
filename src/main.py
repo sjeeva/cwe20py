@@ -2,19 +2,17 @@ from fastapi import FastAPI, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 import sqlite3
 import os
-
-app = FastAPI(
-    title="FastAPI SQL Injection Demo (CWE-89)",
-    description="Illustrates SQL Injection (Vulnerable) vs. Secure Login (Parameterized Queries).",
-    version="1.0.0"
-)
+from contextlib import asynccontextmanager
+import uvicorn # New: Import uvicorn
 
 # --- Database Setup ---
 DATABASE_NAME = "demo.db"
 
 def get_db_connection():
     """Establishes and returns a database connection."""
-    conn = sqlite3.connect(DATABASE_NAME)
+    # *** CHANGE THIS LINE ***
+    # Add check_same_thread=False to allow cross-thread usage (required for FastAPI with sqlite3)
+    conn = sqlite3.connect(DATABASE_NAME, check_same_thread=False)
     conn.row_factory = sqlite3.Row # Allows accessing columns by name
     return conn
 
@@ -35,11 +33,28 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize the database when the application starts
-@app.on_event("startup")
-async def startup_event():
-    init_db()
+# --- Lifespan Event Handler ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Handles application startup and shutdown events.
+    Code before 'yield' runs on startup.
+    Code after 'yield' runs on shutdown.
+    """
+    print("Application starting up...")
+    init_db() # Run your database initialization logic here
     print(f"Database '{DATABASE_NAME}' initialized with dummy users.")
+    yield # The application is now ready to receive requests
+    print("Application shutting down...")
+    # Optional: Add cleanup logic here if needed.
+
+# --- Initialize FastAPI app with the lifespan handler ---
+app = FastAPI(
+    title="FastAPI SQL Injection Demo (CWE-89)",
+    description="Illustrates SQL Injection (Vulnerable) vs. Secure Login (Parameterized Queries).",
+    version="1.0.0",
+    lifespan=lifespan # Pass the lifespan handler here
+)
 
 # --- Helper for database dependency injection ---
 def get_db():
@@ -136,7 +151,6 @@ async def login_vulnerable(username: str = Form(...), password: str = Form(...),
             raise HTTPException(status_code=401, detail="Invalid username or password.")
     except sqlite3.Error as e:
         print(f"[ERROR] Database error: {e}")
-        # Be careful about exposing raw database errors in production
         raise HTTPException(status_code=500, detail=f"Database error during login: {e}")
 
 @app.post("/login_secure")
@@ -150,7 +164,7 @@ async def login_secure(username: str = Form(...), password: str = Form(...), db:
     # SECURE CODE: Use placeholders (?) and pass parameters as a tuple.
     # The database driver handles the escaping, preventing injection.
     sql_query = "SELECT id, username FROM users WHERE username = ? AND password = ?"
-    print(f"\n[DEBUG - SECURE] Executing SQL: {sql_query} with parameters ('{username}', '*****')") # Mask password for logging
+    print(f"\n[DEBUG - SECURE] Executing SQL: {sql_query} with parameters ('{username}', '*****')")
 
     try:
         cursor.execute(sql_query, (username, password))
@@ -162,3 +176,13 @@ async def login_secure(username: str = Form(...), password: str = Form(...), db:
     except sqlite3.Error as e:
         print(f"[ERROR] Database error: {e}")
         raise HTTPException(status_code=500, detail=f"Database error during login: {e}")
+
+
+# --- Embed Uvicorn runner ---
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Important:
+    # - host="0.0.0.0" makes it accessible from your network (if firewall allows).
+    #   Use host="127.0.0.1" for localhost only.
+    # - reload=True is for development: it restarts the server on code changes.
+    #   Remove reload=True for production deployments.
