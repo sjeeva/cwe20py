@@ -241,7 +241,7 @@ async def get_user_secure(user_id: int = Path(..., ge=1, le=999999, description=
 
 
 @app.get("/secure/file")
-async def read_file_secure(filename: str = Query(..., min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9._-]+
+async def read_file_secure(filename: str = Query(..., min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9._-]+$')):
     """
     SECURE ENDPOINT - Proper Path Validation
     
